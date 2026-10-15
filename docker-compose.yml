@@ -1,0 +1,9 @@
+services:
+    gno:
+        build:
+            context: .
+            dockerfile: docker/Dockerfile
+            args:
+                GNGEO_REPO: ${GNGEO_REPO:-https://github.com/coffeecore/gngeo-steward-fu.git}
+                GNGEO_REF: ${GNGEO_REF:-trimui-model-s}
+        image: gngeo-gno-tool:local

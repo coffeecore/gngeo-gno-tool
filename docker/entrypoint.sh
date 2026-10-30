@@ -21,6 +21,7 @@ convert_rom()
     local log_dir
     local log
     local tmp_log
+    local tmp_gno
 
     rom_dir="$(dirname "$rom")"
     base="$(basename "$rom")"
@@ -45,12 +46,29 @@ convert_rom()
     log="$log_dir/${base%.zip}.log"
     tmp_log="${log}.tmp"
 
-    if "$DUMPER" "$rom" >"$tmp_log" 2>&1; then
-        cat "$tmp_log"
-        rm -f "$tmp_log" "$log"
-        return 0
+    # Write to a temporary file so FORCE=1 never destroys a valid GNO
+    # if loading, compression, or conversion fails.
+    if ! tmp_gno="$(mktemp "${output}.tmp.XXXXXXXX")"; then
+        echo "ERROR: cannot create temporary GNO for $base" >&2
+        return 1
     fi
 
+    if "$DUMPER" "$rom" "$tmp_gno" >"$tmp_log" 2>&1; then
+        if [[ "$(head -c 8 "$tmp_gno")" == "gnodmpv1" ]] &&
+           [[ "$(wc -c < "$tmp_gno")" -gt 21 ]]; then
+            if mv -f -- "$tmp_gno" "$output"; then
+                cat "$tmp_log"
+                echo "Installed: $output"
+                rm -f "$tmp_log" "$log"
+                return 0
+            fi
+            echo "ERROR: unable to install GNO: $output" >>"$tmp_log"
+        else
+            echo "ERROR: invalid or incomplete GNO header" >>"$tmp_log"
+        fi
+    fi
+
+    rm -f -- "$tmp_gno"
     cat "$tmp_log"
     mv "$tmp_log" "$log"
 
